@@ -30,13 +30,17 @@ func NewLuaGenerator() *LuaGenerator {
 // Always use this function when embedding user-provided strings in generated Lua code
 // to prevent script injection attacks.
 func EscapeString(s string) string {
+	// Strip null bytes
+	s = strings.ReplaceAll(s, "\x00", "")
+
 	// Replace backslashes first
 	s = strings.ReplaceAll(s, `\`, `\\`)
 
 	// Replace quotes
 	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, `'`, `\'`)
 
-	// Replace newlines
+	// Replace newlines and formatting
 	s = strings.ReplaceAll(s, "\n", `\n`)
 	s = strings.ReplaceAll(s, "\r", `\r`)
 	s = strings.ReplaceAll(s, "\t", `\t`)
