@@ -21,7 +21,7 @@ type GenerateColorRampInput struct {
 // GenerateColorRampOutput defines the output of generate_color_ramp.
 type GenerateColorRampOutput struct {
 	BaseColor        string   `json:"base_color" jsonschema:"Base color used"`
-	Ramp             []string `json:"ramp" jsonschema:"Ordered array of hex colors from darkest shadow to brightest highlight"`
+	Ramp             []string `json:"ramp,omitempty" jsonschema:"Ordered array of hex colors from darkest shadow to brightest highlight"`
 	Steps            int      `json:"steps" jsonschema:"Number of generated colors"`
 	Mode             string   `json:"mode" jsonschema:"Hue shift mode used"`
 	AppendedToSprite bool     `json:"appended_to_sprite,omitempty" jsonschema:"Whether colors were appended to the sprite palette"`

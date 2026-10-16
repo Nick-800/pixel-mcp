@@ -29,7 +29,7 @@ type ApplyAutoShadingInput struct {
 type ApplyAutoShadingOutput struct {
 	Success       bool     `json:"success" jsonschema:"Whether the operation succeeded"`
 	ColorsAdded   int      `json:"colors_added" jsonschema:"Number of colors added to palette"`
-	Palette       []string `json:"palette" jsonschema:"Final palette after shading"`
+	Palette       []string `json:"palette,omitempty" jsonschema:"Final palette after shading"`
 	RegionsShaded int      `json:"regions_shaded" jsonschema:"Number of regions shaded"`
 }
 
