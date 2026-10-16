@@ -65,12 +65,15 @@ app.transaction(function()
 		cel = spr:newCel(layer, frame)
 	end
 
-	local img = cel.image
-`, escapedName, escapedName, frameNumber, frameNumber))
+%s
 
-	// Add pixel drawing commands
+	local img = cel.image
+`, escapedName, escapedName, frameNumber, frameNumber, NormalizeCelSnippet()))
+
+	// Add pixel drawing commands with bounds checking
 	for _, p := range pixels {
-		sb.WriteString(fmt.Sprintf("\timg:putPixel(%d, %d, %s)\n", p.X, p.Y, FormatColorWithPalette(p.Color, usePalette)))
+		sb.WriteString(fmt.Sprintf("\tif %d >= 0 and %d < spr.width and %d >= 0 and %d < spr.height then\n\t\timg:putPixel(%d, %d, %s)\n\tend\n",
+			p.X, p.X, p.Y, p.Y, p.X, p.Y, FormatColorWithPalette(p.Color, usePalette)))
 	}
 
 	sb.WriteString(`end)
@@ -725,19 +728,6 @@ if not frame then
 	error("Frame not found: %d")
 end
 
--- Get or create cel
-local cel = layer:cel(frame)
-if not cel then
-	cel = spr:newCel(layer, frame)
-end
-
--- Create or get image
-local img = cel.image
-if not img then
-	img = Image(spr.width, spr.height, spr.colorMode)
-	cel.image = img
-end
-
 -- Helper: Find nearest palette index for given RGBA color
 local function findNearestPaletteIndex(r, g, b, a)
 	local palette = spr.palettes[1]
@@ -785,16 +775,29 @@ local threshold = %f * (matrixSize * matrixSize)
 
 -- Apply dithering pattern
 app.transaction(function()
+	local cel = layer:cel(frame)
+	if not cel then
+		cel = spr:newCel(layer, frame)
+	end
+
+%s
+
+	local img = cel.image
+
 	for py = 0, %d - 1 do
 		for px = 0, %d - 1 do
-			local mx = (px %% matrixSize) + 1
-			local my = (py %% matrixSize) + 1
-			local matrixValue = matrix[my][mx]
+			local drawX = %d + px
+			local drawY = %d + py
+			if drawX >= 0 and drawX < spr.width and drawY >= 0 and drawY < spr.height then
+				local mx = (px %% matrixSize) + 1
+				local my = (py %% matrixSize) + 1
+				local matrixValue = matrix[my][mx]
 
-			local useColor2 = matrixValue < threshold
-			local finalColor = useColor2 and color2 or color1
+				local useColor2 = matrixValue < threshold
+				local finalColor = useColor2 and color2 or color1
 
-			img:drawPixel(%d + px, %d + py, finalColor)
+				img:drawPixel(drawX, drawY, finalColor)
+			end
 		end
 	end
 end)
@@ -809,6 +812,7 @@ print("Dithering applied successfully")`,
 		c2.R, c2.G, c2.B, c2.A,
 		matrixCode,
 		density,
+		NormalizeCelSnippet(),
 		height, width,
 		x, y)
 }
@@ -849,19 +853,6 @@ end
 local frame = spr.frames[%d]
 if not frame then
 	error("Frame not found: %d")
-end
-
--- Get or create cel
-local cel = layer:cel(frame)
-if not cel then
-	cel = spr:newCel(layer, frame)
-end
-
--- Create or get image
-local img = cel.image
-if not img then
-	img = Image(spr.width, spr.height, spr.colorMode)
-	cel.image = img
 end
 
 -- Helper: Find nearest palette index for given RGBA color
@@ -908,6 +899,15 @@ end
 
 -- Floyd-Steinberg error diffusion
 app.transaction(function()
+	local cel = layer:cel(frame)
+	if not cel then
+		cel = spr:newCel(layer, frame)
+	end
+
+%s
+
+	local img = cel.image
+
 	-- Create error buffer (width+2 to handle edges, 2 rows for current and next)
 	local errors = {}
 	for row = 0, 1 do
@@ -1028,7 +1028,11 @@ app.transaction(function()
 				end
 			end
 
-			img:drawPixel(%d + px, %d + py, targetColor)
+			local drawX = %d + px
+			local drawY = %d + py
+			if drawX >= 0 and drawX < spr.width and drawY >= 0 and drawY < spr.height then
+				img:drawPixel(drawX, drawY, targetColor)
+			end
 		end
 	end
 end)
@@ -1039,18 +1043,19 @@ print("Dithering applied successfully")`,
 		frameNumber, frameNumber,
 		c1.R, c1.G, c1.B, c1.A,
 		c2.R, c2.G, c2.B, c2.A,
-		width,  // line 915: error buffer width
-		height, // line 920: py loop
-		width,  // line 925: clear buffer width
-		width,  // line 930: px loop
-		width,  // line 933: width check for division by zero
-		width,  // line 936: gradient calculation
-		width,  // line 967: right neighbor check
-		height, // line 972: bottom neighbor check
-		width,  // line 981: bottom-right check
-		width,  // line 1007: right neighbor check (RGB)
-		height, // line 1012: bottom neighbor check (RGB)
-		width,  // line 1021: bottom-right check (RGB)
-		x,      // line 1031: x coordinate
-		y)      // line 1031: y coordinate
+		NormalizeCelSnippet(),
+		width,  // error buffer width
+		height, // py loop
+		width,  // clear buffer width
+		width,  // px loop
+		width,  // width check for division by zero
+		width,  // gradient calculation
+		width,  // right neighbor check
+		height, // bottom neighbor check
+		width,  // bottom-right check
+		width,  // right neighbor check (RGB)
+		height, // bottom neighbor check (RGB)
+		width,  // bottom-right check (RGB)
+		x,      // drawX coordinate
+		y)      // drawY coordinate
 }

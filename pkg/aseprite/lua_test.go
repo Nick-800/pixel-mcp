@@ -166,6 +166,14 @@ func TestLuaGenerator_DrawPixels(t *testing.T) {
 	if !strings.Contains(script, "img:putPixel(1, 1, Color(0, 255, 0, 255))") {
 		t.Error("script missing second pixel")
 	}
+
+	if !strings.Contains(script, "cel.position = Point(0, 0)") {
+		t.Error("script missing cel normalization")
+	}
+
+	if !strings.Contains(script, "spr.width") || !strings.Contains(script, "spr.height") {
+		t.Error("script missing bounds check against canvas size")
+	}
 }
 
 func TestLuaGenerator_ExportSprite(t *testing.T) {
@@ -1343,22 +1351,27 @@ func TestLuaGenerator_DrawWithDither(t *testing.T) {
 		{
 			name:     "bayer_2x2 pattern",
 			pattern:  "bayer_2x2",
-			checkFor: []string{"local matrix = {{0, 2}, {3, 1}}", "local matrixSize = 2"},
+			checkFor: []string{"local matrix = {{0, 2}, {3, 1}}", "local matrixSize = 2", "cel.position = Point(0, 0)"},
 		},
 		{
 			name:     "bayer_4x4 pattern",
 			pattern:  "bayer_4x4",
-			checkFor: []string{"local matrix = {", "local matrixSize = 4"},
+			checkFor: []string{"local matrix = {", "local matrixSize = 4", "cel.position = Point(0, 0)"},
 		},
 		{
 			name:     "checkerboard pattern",
 			pattern:  "checkerboard",
-			checkFor: []string{"local matrix = {{0, 1}, {1, 0}}", "local matrixSize = 2"},
+			checkFor: []string{"local matrix = {{0, 1}, {1, 0}}", "local matrixSize = 2", "cel.position = Point(0, 0)"},
 		},
 		{
 			name:     "grass pattern",
 			pattern:  "grass",
-			checkFor: []string{"local matrixSize = 6"},
+			checkFor: []string{"local matrixSize = 6", "cel.position = Point(0, 0)"},
+		},
+		{
+			name:     "floyd_steinberg pattern",
+			pattern:  "floyd_steinberg",
+			checkFor: []string{"Floyd-Steinberg error diffusion", "cel.position = Point(0, 0)"},
 		},
 	}
 
@@ -1376,6 +1389,19 @@ func TestLuaGenerator_DrawWithDither(t *testing.T) {
 				t.Error("DrawWithDither() missing layer name in script")
 			}
 		})
+	}
+}
+
+func TestLuaGenerator_NormalizeCelSnippet(t *testing.T) {
+	snippet := NormalizeCelSnippet()
+	if !strings.Contains(snippet, "cel.position = Point(0, 0)") {
+		t.Error("NormalizeCelSnippet missing cel.position assignment")
+	}
+	if !strings.Contains(snippet, "Image(spr.spec)") {
+		t.Error("NormalizeCelSnippet missing Image(spr.spec) creation")
+	}
+	if !strings.Contains(snippet, "full:drawImage(cel.image, cel.position)") {
+		t.Error("NormalizeCelSnippet missing drawImage")
 	}
 }
 

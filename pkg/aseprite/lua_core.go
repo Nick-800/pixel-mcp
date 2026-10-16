@@ -195,3 +195,28 @@ func WrapInTransaction(code string) string {
 %s
 end)`, code)
 }
+
+// NormalizeCelSnippet returns a Lua snippet that expands cel.image to the
+// full canvas dimensions and normalizes cel.position to Point(0, 0).
+//
+// Aseprite trims cels drawn with drawing tools (e.g. app.useTool with rectangle,
+// ellipse, line, or paint_bucket) to their non-empty content bounds. This results
+// in cel.position != (0, 0) and cel.image smaller than the sprite canvas. Direct
+// pixel operations (such as img:putPixel or img:drawPixel) that write at sprite
+// coordinates directly into cel.image would then offset the pixels or silently drop
+// writes falling outside the trimmed cel bounds.
+//
+// Normalizing copies the existing cel image into a full canvas-sized image positioned
+// at Point(0, 0), ensuring sprite coordinates directly match image coordinates.
+//
+// The returned snippet expects Lua locals 'spr' and 'cel' to be in scope.
+func NormalizeCelSnippet() string {
+	return `	local b = cel.bounds
+	if b.x ~= 0 or b.y ~= 0 or b.width ~= spr.width or b.height ~= spr.height then
+		local full = Image(spr.spec)
+		full:clear()
+		full:drawImage(cel.image, cel.position)
+		cel.image = full
+		cel.position = Point(0, 0)
+	end`
+}
