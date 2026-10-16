@@ -174,7 +174,7 @@ Then use natural language to create sprites:
 ### Inspection & Export
 | Tool | Description |
 |------|-------------|
-| `get_pixels` | Read pixel data from a rectangular region (paginated, for verification) |
+| `get_pixels` | Read pixel data from a rectangular region; supports paginated `pixels` format or compact `grid` format with legend |
 | `export_sprite` | Export sprite to PNG/GIF/JPG/BMP |
 | `export_spritesheet` | Export animation frames as spritesheet (horizontal/vertical/rows/columns/packed layout, optional JSON metadata) |
 | `import_image` | Import external image file as a layer in the sprite |
