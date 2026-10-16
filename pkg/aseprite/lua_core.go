@@ -95,34 +95,74 @@ func FormatColorWithPaletteForTool(c Color, usePalette bool) string {
 // palette using Euclidean color space distance.
 //
 // Include this helper at the start of scripts that use palette-aware drawing (use_palette=true).
+//
+// The palette is read into a Lua table on first use and each distinct input color's
+// result is memoized, so snapping N pixels costs one palette read plus one search per
+// distinct color instead of N*len(palette) palette:getColor calls. This assumes the
+// script does not modify the palette after the first snap, which holds for every
+// drawing script that includes this helper.
 func GeneratePaletteSnapperHelper() string {
 	return `
--- Helper: Find nearest palette index for given RGBA color
-local function findNearestPaletteIndex(r, g, b, a)
+-- Palette entries as {r, g, b, a}, read once on first use
+local snapPalette = nil
+-- Memoized nearest index per packed RGBA input color
+local snapMemo = {}
+
+local function loadSnapPalette()
+	snapPalette = {}
 	local spr = app.activeSprite
 	local palette = spr.palettes[1]
 	if not palette or #palette == 0 then
-		return 0
+		return
+	end
+	for i = 0, #palette - 1 do
+		local palColor = palette:getColor(i)
+		snapPalette[i] = {palColor.red, palColor.green, palColor.blue, palColor.alpha}
+	end
+end
+
+-- Helper: Find nearest palette index for given RGBA color
+local function findNearestPaletteIndex(r, g, b, a)
+	local key = ((r * 256 + g) * 256 + b) * 256 + a
+	local cached = snapMemo[key]
+	if cached then
+		return cached
+	end
+	if not snapPalette then
+		loadSnapPalette()
 	end
 
 	local minDist = math.huge
 	local nearestIndex = 0
 
-	for i = 0, #palette - 1 do
-		local palColor = palette:getColor(i)
-		local dr = r - palColor.red
-		local dg = g - palColor.green
-		local db = b - palColor.blue
-		local da = a - palColor.alpha
+	local i = 0
+	local entry = snapPalette[0]
+	while entry do
+		local dr = r - entry[1]
+		local dg = g - entry[2]
+		local db = b - entry[3]
+		local da = a - entry[4]
 		local dist = dr*dr + dg*dg + db*db + da*da
 
 		if dist < minDist then
 			minDist = dist
 			nearestIndex = i
 		end
+		i = i + 1
+		entry = snapPalette[i]
 	end
 
+	snapMemo[key] = nearestIndex
 	return nearestIndex
+end
+
+-- Helper: RGBA pixel value of a palette entry (transparent black if the palette is empty)
+local function snapPaletteRGBA(index)
+	local entry = snapPalette[index]
+	if not entry then
+		return app.pixelColor.rgba(0, 0, 0, 0)
+	end
+	return app.pixelColor.rgba(entry[1], entry[2], entry[3], entry[4])
 end
 
 -- Helper: Snap color for img:putPixel (returns palette index in indexed mode)
@@ -133,10 +173,7 @@ local function snapToPaletteForPixel(r, g, b, a)
 		return findNearestPaletteIndex(r, g, b, a)
 	else
 		-- In RGB/Grayscale, return pixel color
-		local nearestIndex = findNearestPaletteIndex(r, g, b, a)
-		local palette = spr.palettes[1]
-		local nearestColor = palette:getColor(nearestIndex)
-		return app.pixelColor.rgba(nearestColor.red, nearestColor.green, nearestColor.blue, nearestColor.alpha)
+		return snapPaletteRGBA(findNearestPaletteIndex(r, g, b, a))
 	end
 end
 
@@ -150,9 +187,7 @@ local function snapToPaletteForTool(r, g, b, a)
 		return nearestIndex
 	else
 		-- In RGB/Grayscale, app.useTool expects pixel color
-		local palette = spr.palettes[1]
-		local nearestColor = palette:getColor(nearestIndex)
-		return app.pixelColor.rgba(nearestColor.red, nearestColor.green, nearestColor.blue, nearestColor.alpha)
+		return snapPaletteRGBA(nearestIndex)
 	end
 end
 
