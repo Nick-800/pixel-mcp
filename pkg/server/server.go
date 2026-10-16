@@ -132,6 +132,7 @@ func (s *Server) registerTools() {
 
 	// Register drawing tools
 	tools.RegisterDrawingTools(s.mcp, s.client, s.gen, s.config, s.logger)
+	tools.RegisterBatchTools(s.mcp, s.client, s.gen, s.config, s.logger)
 
 	// Register selection tools
 	tools.RegisterSelectionTools(s.mcp, s.client, s.gen, s.config, s.logger)

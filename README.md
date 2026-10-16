@@ -114,6 +114,7 @@ Then use natural language to create sprites:
 ### Drawing & Painting
 | Tool | Description |
 |------|-------------|
+| `batch_draw` | Apply multiple drawing operations atomically in a single Aseprite run |
 | `draw_pixels` | Draw individual pixels (supports batch operations, optional palette snapping) |
 | `draw_line` | Draw a line between two points (optional palette snapping) |
 | `draw_contour` | Draw a polyline or polygon by connecting multiple points (optional palette snapping) |

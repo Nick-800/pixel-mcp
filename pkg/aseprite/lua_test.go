@@ -1941,3 +1941,122 @@ func TestLuaGenerator_ApplyShading_AllDirections(t *testing.T) {
 		})
 	}
 }
+
+func TestLuaGenerator_BatchDraw(t *testing.T) {
+	gen := NewLuaGenerator()
+
+	sampleOps := []BatchOp{
+		{
+			Type:        BatchOpLine,
+			LayerName:   `Layer "1"`,
+			FrameNumber: 1,
+			X1:          0,
+			Y1:          0,
+			X2:          10,
+			Y2:          10,
+			Color:       Color{R: 255, G: 0, B: 0, A: 255},
+			Thickness:   2,
+		},
+		{
+			Type:        BatchOpRectangle,
+			LayerName:   `Layer \Background\`,
+			FrameNumber: 2,
+			X:           5,
+			Y:           5,
+			Width:       20,
+			Height:      15,
+			Color:       Color{R: 0, G: 255, B: 0, A: 255},
+			Filled:      true,
+		},
+		{
+			Type:        BatchOpPixels,
+			LayerName:   `Layer "1"`,
+			FrameNumber: 1,
+			Pixels: []Pixel{
+				{Point: Point{X: 1, Y: 1}, Color: Color{R: 0, G: 0, B: 255, A: 255}},
+			},
+		},
+	}
+
+	t.Run("single transaction and saveAs", func(t *testing.T) {
+		script := gen.BatchDraw(sampleOps, false)
+
+		// Must emit exactly one app.transaction(
+		txCount := strings.Count(script, "app.transaction(")
+		if txCount != 1 {
+			t.Errorf("expected exactly 1 app.transaction(, got %d", txCount)
+		}
+
+		// Must emit exactly one saveAs(
+		saveCount := strings.Count(script, "saveAs(")
+		if saveCount != 1 {
+			t.Errorf("expected exactly 1 saveAs(, got %d", saveCount)
+		}
+
+		// Must include success print naming operation count
+		if !strings.Contains(script, `print("Batch completed: 3 operations")`) {
+			t.Error("script missing expected success print statement")
+		}
+	})
+
+	t.Run("palette helper only when usePalette is true", func(t *testing.T) {
+		scriptWithoutPalette := gen.BatchDraw(sampleOps, false)
+		if strings.Contains(scriptWithoutPalette, "snapToPaletteForTool") || strings.Contains(scriptWithoutPalette, "findNearestPaletteIndex") {
+			t.Error("script without usePalette should not include palette helper")
+		}
+
+		scriptWithPalette := gen.BatchDraw(sampleOps, true)
+		if !strings.Contains(scriptWithPalette, "snapToPaletteForTool") || !strings.Contains(scriptWithPalette, "findNearestPaletteIndex") {
+			t.Error("script with usePalette should include palette helper")
+		}
+		// Palette helper should only be emitted once at most
+		if strings.Count(scriptWithPalette, "local function findNearestPaletteIndex") != 1 {
+			t.Errorf("palette helper should be emitted exactly once, got %d", strings.Count(scriptWithPalette, "local function findNearestPaletteIndex"))
+		}
+	})
+
+	t.Run("escaped layer names", func(t *testing.T) {
+		script := gen.BatchDraw(sampleOps, false)
+
+		// Layer "1" should be escaped as Layer \"1\"
+		if !strings.Contains(script, `getLayer("Layer \"1\"")`) {
+			t.Error("script missing properly escaped quotes in getLayer")
+		}
+		if !strings.Contains(script, `Layer not found: Layer \"1\"`) {
+			t.Error("script missing properly escaped quotes in error message")
+		}
+
+		// Layer \Background\ should be escaped as Layer \\Background\\
+		if !strings.Contains(script, `getLayer("Layer \\Background\\")`) {
+			t.Error("script missing properly escaped backslashes in getLayer")
+		}
+	})
+
+	t.Run("op-index error messages", func(t *testing.T) {
+		script := gen.BatchDraw(sampleOps, false)
+
+		// Op 0 errors
+		if !strings.Contains(script, `error("operations[0]: Layer not found:`) {
+			t.Error("missing operations[0] layer error message")
+		}
+		if !strings.Contains(script, `error("operations[0]: Frame not found: 1")`) {
+			t.Error("missing operations[0] frame error message")
+		}
+
+		// Op 1 errors
+		if !strings.Contains(script, `error("operations[1]: Layer not found:`) {
+			t.Error("missing operations[1] layer error message")
+		}
+		if !strings.Contains(script, `error("operations[1]: Frame not found: 2")`) {
+			t.Error("missing operations[1] frame error message")
+		}
+
+		// Op 2 errors
+		if !strings.Contains(script, `error("operations[2]: Layer not found:`) {
+			t.Error("missing operations[2] layer error message")
+		}
+		if !strings.Contains(script, `error("operations[2]: Frame not found: 1")`) {
+			t.Error("missing operations[2] frame error message")
+		}
+	})
+}
